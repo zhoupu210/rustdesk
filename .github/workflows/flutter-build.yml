@@ -556,7 +556,7 @@ jobs:
 
   # The fallback for the flutter version, we use Sciter for 32bit Windows.
   
-build-for-windows-sciter:
+  build-for-windows-sciter:
     if: false
     runs-on: ubuntu-latest
     steps:
