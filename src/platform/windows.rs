@@ -1778,7 +1778,14 @@ if exist \"{tmp_path}\\{app_name} Tray.lnk\" del /f /q \"{tmp_path}\\{app_name} 
         Config::set_option("api-server".into(), lic.api);
     }
 
-    let tray_shortcuts = "".to_owned();
+    let tray_shortcuts = if config::is_outgoing_only() {
+        "".to_owned()
+    } else {
+        format!("
+{tray_shortcut_commands}
+copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
+")
+    };
 
     let install_remote_printer = if install_printer {
         // No need to use `|| true` here.
@@ -3346,7 +3353,41 @@ impl Drop for WakeLock {
 //
 // Returns `false` if another tray process is already running in this session.
 pub fn try_lock_tray_single_instance() -> bool {
-    return false;
+    use winapi::um::{
+        errhandlingapi::{GetLastError, SetLastError},
+        synchapi::CreateMutexW,
+    };
+    // `Local\` is the per session namespace, so the name is scoped to this
+    // session already and cannot be squatted by another user.
+    let name = wide_string(&format!("Local\\{}_tray", crate::get_app_name()));
+    unsafe {
+        // A successful `CreateMutexW` doesn't clear the last error, clear it to
+        // reliably detect `ERROR_ALREADY_EXISTS`.
+        SetLastError(0);
+        // The handle is deliberately kept open for the lifetime of the process.
+        let handle = CreateMutexW(null_mut(), FALSE, name.as_ptr());
+        let last_error = GetLastError();
+        if !handle.is_null() {
+            if last_error == ERROR_ALREADY_EXISTS {
+                CloseHandle(handle);
+                return false;
+            }
+            return true;
+        }
+        if last_error == ERROR_ACCESS_DENIED {
+            // The mutex exists but was created by a tray running at a higher
+            // integrity level, which is exactly the elevated tray described
+            // above. Defer to it instead of adding a second icon.
+            return false;
+        }
+        // Unexpected: show the tray icon anyway, a duplicated icon is better
+        // than never showing the tray icon at all.
+        log::warn!(
+            "Failed to create the tray single instance mutex: {}",
+            io::Error::from_raw_os_error(last_error as _)
+        );
+        true
+    }
 }
 
 /// Returns `true` on failure or cancellation so the caller keeps running.
@@ -4115,9 +4156,9 @@ fn run_after_run_cmds(silent: bool) {
             .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
             .spawn());
     }
-    // if Config::get_option("stop-service") != "Y" {
-    //     allow_err!(std::process::Command::new(&exe).arg("--tray").spawn());
-    // }
+    if Config::get_option("stop-service") != "Y" {
+        allow_err!(std::process::Command::new(&exe).arg("--tray").spawn());
+    }
     std::thread::sleep(std::time::Duration::from_millis(300));
 }
 
