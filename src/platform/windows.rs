@@ -1778,14 +1778,7 @@ if exist \"{tmp_path}\\{app_name} Tray.lnk\" del /f /q \"{tmp_path}\\{app_name} 
         Config::set_option("api-server".into(), lic.api);
     }
 
-    let tray_shortcuts = if config::is_outgoing_only() {
-        "".to_owned()
-    } else {
-        format!("
-{tray_shortcut_commands}
-copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
-")
-    };
+    let tray_shortcuts = "".to_owned();
 
     let install_remote_printer = if install_printer {
         // No need to use `|| true` here.
@@ -4156,9 +4149,9 @@ fn run_after_run_cmds(silent: bool) {
             .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
             .spawn());
     }
-    if Config::get_option("stop-service") != "Y" {
-        allow_err!(std::process::Command::new(&exe).arg("--tray").spawn());
-    }
+    // if Config::get_option("stop-service") != "Y" {
+    //     allow_err!(std::process::Command::new(&exe).arg("--tray").spawn());
+    // }
     std::thread::sleep(std::time::Duration::from_millis(300));
 }
 
