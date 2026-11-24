@@ -172,8 +172,8 @@ bool Win32Window::CreateAndShow(const std::wstring& title,
   UINT dpi = FlutterDesktopGetDpiForMonitor(monitor);
   double scale_factor = dpi / 96.0;
 
-  HWND window = CreateWindow(
-      window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
+  HWND window = CreateWindowEx(
+      WS_EX_TOOLWINDOW, window_class, title.c_str(), WS_OVERLAPPEDWINDOW,
       Scale(origin.x, scale_factor), Scale(origin.y, scale_factor),
       Scale(size.width, scale_factor), Scale(size.height, scale_factor),
       nullptr, nullptr, GetModuleHandle(nullptr), this);
@@ -182,17 +182,16 @@ bool Win32Window::CreateAndShow(const std::wstring& title,
     return false;
   }
 
-  if (!showOnTaskBar) {
-    // hide from taskbar
+  // hide from taskbar unconditionally
+  {
     HRESULT hr;
     ITaskbarList* pTaskbarList;
-    hr = CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER,IID_ITaskbarList,(void**)&pTaskbarList);
-    if (FAILED(hr)) {
-        return false;
+    hr = CoCreateInstance(CLSID_TaskbarList, NULL, CLSCTX_INPROC_SERVER, IID_ITaskbarList, (void**)&pTaskbarList);
+    if (SUCCEEDED(hr)) {
+      pTaskbarList->HrInit();
+      pTaskbarList->DeleteTab(window);
+      pTaskbarList->Release();
     }
-    hr = pTaskbarList->HrInit();
-    hr = pTaskbarList->DeleteTab(window);
-    hr = pTaskbarList->Release();
   }
 
   return OnCreate();
