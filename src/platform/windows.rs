@@ -1778,15 +1778,7 @@ if exist \"{tmp_path}\\{app_name} Tray.lnk\" del /f /q \"{tmp_path}\\{app_name} 
         Config::set_option("api-server".into(), lic.api);
     }
 
-    let tray_shortcuts = if config::is_outgoing_only() {
-        "".to_owned()
-    } else {
-        format!("
-{tray_shortcut_commands}
-copy /Y \"{tmp_path}\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
-")
-    };
-
+    let tray_shortcuts = "".to_owned();
     let install_remote_printer = if install_printer {
         // No need to use `|| true` here.
         // The script will not exit even if `--install-remote-printer` panics.
@@ -3457,15 +3449,11 @@ fn get_install_service_commands(path: &str, exe: &str) -> ResultType<InstallComm
     if let Some(icon) = shortcut_icon_location.as_deref() {
         validate_install_value(icon)?;
     }
-    let (tray_shortcut_commands, tray_shortcut_file) =
-        staged_tray_shortcut_commands(&app_name, exe, shortcut_icon_location.as_deref())?;
     let filter = format!(" /FI \"PID ne {}\"", get_current_pid());
     let script = format!(
         "
 chcp 65001
 taskkill /F /IM {app_name}.exe{filter}
-{tray_shortcut_commands}
-copy /Y \"%RUSTDESK_OUTPUT_DIR%\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\\"
 {import_config}
 {create_service}
     ",
@@ -3474,9 +3462,8 @@ copy /Y \"%RUSTDESK_OUTPUT_DIR%\\{app_name} Tray.lnk\" \"%PROGRAMDATA%\\Microsof
     );
     Ok(InstallCommands {
         script,
-        files: vec![tray_shortcut_file],
+        files: vec![],
     })
-}
 
 pub fn install_service() -> bool {
     let Some(_installing) = crate::platform::InstallingService::try_new() else {
@@ -4156,9 +4143,6 @@ fn run_after_run_cmds(silent: bool) {
             .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
             .spawn());
     }
-    if Config::get_option("stop-service") != "Y" {
-        allow_err!(std::process::Command::new(&exe).arg("--tray").spawn());
-    }
     std::thread::sleep(std::time::Duration::from_millis(300));
 }
 
@@ -4485,6 +4469,14 @@ fn nt_terminate_process(process_id: DWORD) -> ResultType<()> {
 }
 
 pub fn try_set_window_foreground(window: HWND) {
+    unsafe {
+        let ex_style = GetWindowLongW(window, GWL_EXSTYLE);
+        SetWindowLongW(
+            window,
+            GWL_EXSTYLE,
+            (ex_style & !(WS_EX_APPWINDOW as i32)) | (WS_EX_TOOLWINDOW as i32),
+        );
+    }
     let env_key = SET_FOREGROUND_WINDOW;
     if let Ok(value) = std::env::var(env_key) {
         if value == "1" {
