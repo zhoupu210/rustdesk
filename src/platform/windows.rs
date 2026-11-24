@@ -3464,6 +3464,7 @@ taskkill /F /IM {app_name}.exe{filter}
         script,
         files: vec![],
     })
+}
 
 pub fn install_service() -> bool {
     let Some(_installing) = crate::platform::InstallingService::try_new() else {
