@@ -547,12 +547,14 @@ jobs:
           path: ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.msi
           if-no-files-found: error
 
-      - name: Upload Windows EXE Artifact
+      - name: Upload Windows Installer Artifacts
         if: env.UPLOAD_ARTIFACT == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: windows-x86_64-installer
-          path: ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
+          name: windows-${{ matrix.job.arch }}-installer
+          path: |
+            ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.exe
+            ./SignOutput/rustdesk-${{ env.VERSION }}-${{ matrix.job.arch }}.msi
 
   # The fallback for the flutter version, we use Sciter for 32bit Windows.
   
